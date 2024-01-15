@@ -3,6 +3,7 @@ const inputLoginButtonID = "button-login";
 const logoutButtonID = "button-logout";
 const inputLogoutButtonID = "input-message";
 const messageContainerID = "message-container";
+const showAllCheckboxID = "show-all-checkbox";
 
 function writeLoginForm() {
   document.querySelector("#container").innerHTML = 
@@ -17,7 +18,9 @@ function writeMessage(username) {
   document.querySelector("#container").innerHTML = 
     `<input type="text" id=${inputLogoutButtonID} placeholder='Write your message'/> 
     <button id='${logoutButtonID}'>Esci</button>
-    <div id="${messageContainerID}"></div>`;
+    <div id="${messageContainerID}"></div>
+    <label for="${showAllCheckboxID}">Show All Messages</label>
+    <input type="checkbox" id="${showAllCheckboxID}" onchange="handleShowAllChange()">`;
 
   const elementButtonLogout = document.querySelector(`#${logoutButtonID}`);
   const elementInputMessage = document.querySelector(`#${inputLogoutButtonID}`);
@@ -69,48 +72,86 @@ function onClickLogout() {
 
 function handleKeyPress(event, username) {
   if (event.key === "Enter") {
-    saveMessage(username);
-    showMessage(username);
-    clearInput();
+    const inputMessage = document.querySelector(`#${inputLogoutButtonID}`);
+    const message = inputMessage.value.trim();
+
+    if (message !== "") {
+      saveMessage(username, message);
+      showMessage(username);
+      clearInput();
+    } else {
+      alert("Il messaggio non può essere vuoto.");
+    }
   }
 }
 
-function saveMessage(username) {
-  const inputMessage = document.querySelector(`#${inputLogoutButtonID}`);
-  const message = inputMessage.value;
+function saveMessage(username, message) {
+  const now = new Date();
+  const timestamp = now.toLocaleString();
 
   let userMessages = JSON.parse(localStorage.getItem("userMessages")) || {};
   userMessages[username] = userMessages[username] || [];
-  userMessages[username].push(message);
+  userMessages[username].push({ content: message, timestamp: timestamp });
   localStorage.setItem("userMessages", JSON.stringify(userMessages));
 }
 
 function showMessage(username) {
+  const showAllCheckbox = document.querySelector(`#${showAllCheckboxID}`);
   const userMessages = JSON.parse(localStorage.getItem("userMessages")) || {};
-  const userMessagesArray = userMessages[username] || [];
-
-  const messageElement = document.createElement("div");
-  messageElement.textContent = userMessagesArray[userMessagesArray.length - 1];
-
   const messageContainer = document.querySelector(`#${messageContainerID}`);
-  messageContainer.appendChild(messageElement);
+  messageContainer.innerHTML = "";
+
+  if (showAllCheckbox.checked) {
+    for (const user in userMessages) {
+      userMessages[user].forEach((message, index) => {
+        const messageElement = createMessageElement(user, message.content, message.timestamp, username, index);
+        messageContainer.appendChild(messageElement);
+      });
+    }
+  } else {
+    const userMessagesArray = userMessages[username] || [];
+    userMessagesArray.forEach((message, index) => {
+      const messageElement = createMessageElement(username, message.content, message.timestamp, username, index);
+      messageContainer.appendChild(messageElement);
+    });
+  }
+}
+
+function createMessageElement(author, content, timestamp, currentUser, index) {
+  const messageElement = document.createElement("div");
+  messageElement.classList.add("message");
+  messageElement.textContent = `${author}: ${content} (${timestamp})`;
+
+  if (author === currentUser) {
+    const deleteButton = document.createElement("button");
+    deleteButton.textContent = "Delete";
+    deleteButton.addEventListener("click", () => onDeleteMessage(currentUser, index));
+    messageElement.appendChild(deleteButton);
+  }
+
+  return messageElement;
+}
+
+function onDeleteMessage(username, index) {
+  let userMessages = JSON.parse(localStorage.getItem("userMessages")) || {};
+  userMessages[username] = userMessages[username] || [];
+  userMessages[username].splice(index, 1);
+  localStorage.setItem("userMessages", JSON.stringify(userMessages));
+  showMessage(username);
 }
 
 function loadMessages(username) {
-  const userMessages = JSON.parse(localStorage.getItem("userMessages")) || {};
-  const userMessagesArray = userMessages[username] || [];
-  const messageContainer = document.querySelector(`#${messageContainerID}`);
-
-  userMessagesArray.forEach((message) => {
-    const messageElement = document.createElement("div");
-    messageElement.textContent = message;
-    messageContainer.appendChild(messageElement);
-  });
+  showMessage(username);
 }
 
 function clearInput() {
   const inputMessage = document.querySelector(`#${inputLogoutButtonID}`);
   inputMessage.value = "";
+}
+
+function handleShowAllChange() {
+  const userName = getCurrentUserName();
+  showMessage(userName);
 }
 
 window.onload = function () {
